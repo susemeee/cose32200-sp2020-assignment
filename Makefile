@@ -1,6 +1,6 @@
 
-obj-m += lkm_proc_example.o
-KDIR = /home/assignee/linux-4.4
+obj-m += lkm_proc_inspection.o
+KDIR = /home/susemeee/linux
 
 all:
 	$(MAKE) -C $(KDIR) SUBDIRS=$(PWD) modules

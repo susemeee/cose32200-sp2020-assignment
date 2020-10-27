@@ -7,27 +7,23 @@
 
 #define QUEUE_SIZE 100
 
-#ifndef sector_t
-#define sector_t int
-#endif
-
-#ifndef printk
-#define printk printf
-#define KERN_WARNING
-#endif
+typedef struct {
+  unsigned long long number;
+  const char* devname;
+  char* procname;
+  int at;
+} sector_info;
 
 typedef struct {
-  sector_t q[QUEUE_SIZE];
+  sector_info* q[QUEUE_SIZE];
   int rear;
   int front;
 } circular_queue;
 
 
-int _is_queue_full(circular_queue* queue);
+void enqueue(circular_queue* queue, sector_info* sector);
 
-void enqueue_sector(circular_queue* queue, sector_t sector);
-
-sector_t dequeue_sector(circular_queue* queue);
+sector_info* dequeue(circular_queue* queue);
 
 #endif
 

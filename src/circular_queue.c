@@ -7,10 +7,9 @@ int _is_queue_full(circular_queue* queue) {
   return 0;
 }
 
-void enqueue_sector(circular_queue* queue, sector_t sector) {
-  if (_is_queue_full(queue)) {
-    printk(KERN_WARNING "Circular queue is full");
-  } else {
+void enqueue(circular_queue* queue, sector_info* sector) {
+  if (_is_queue_full(queue) != 1) {
+    
     if (queue->front == -1) {
       queue->front = 0;
       queue->rear = 0;
@@ -24,13 +23,13 @@ void enqueue_sector(circular_queue* queue, sector_t sector) {
   }
 }
 
-sector_t dequeue_sector(circular_queue* queue) {
+sector_info* dequeue(circular_queue* queue) {
   if (queue->front == -1) {
-    printk(KERN_WARNING "Circular queue is empty");
-    return 0;
+    printk(KERN_WARNING "Circular queue is empty\n");
+    return NULL;
   } else {
 
-    int element = queue->q[queue->front];
+    sector_info* element = queue->q[queue->front];
 
     if (queue->front == queue->rear) {
       queue->front = -1;

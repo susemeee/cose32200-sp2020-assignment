@@ -8,14 +8,14 @@ int main() {
     .front = -1,
   };
 
-  enqueue_sector(&queue, 1);
-  enqueue_sector(&queue, 2);
-  enqueue_sector(&queue, 3);
-  printf("%d\n", dequeue_sector(&queue));
-  enqueue_sector(&queue, 4);
-  printf("%d\n", dequeue_sector(&queue));
-  printf("%d\n", dequeue_sector(&queue));
-  printf("%d\n", dequeue_sector(&queue));
+  enqueue(&queue, 1);
+  enqueue(&queue, 2);
+  enqueue(&queue, 3);
+  printf("%d\n", dequeue(&queue));
+  enqueue(&queue, 4);
+  printf("%d\n", dequeue(&queue));
+  printf("%d\n", dequeue(&queue));
+  printf("%d\n", dequeue(&queue));
 
   return 0;
 }

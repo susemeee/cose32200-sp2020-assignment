@@ -1,0 +1,53 @@
+diff --git a/block/Makefile b/block/Makefile
+index 00ecc97..96c346f 100644
+--- a/block/Makefile
++++ b/block/Makefile
+@@ -10,6 +10,8 @@ obj-$(CONFIG_BLOCK) := bio.o elevator.o blk-core.o blk-tag.o blk-sysfs.o \
+ 			genhd.o scsi_ioctl.o partition-generic.o ioprio.o \
+ 			partitions/
+ 
++obj-$(CONFIG_BLOCK) += circular_queue.o
++
+ obj-$(CONFIG_BOUNCE)	+= bounce.o
+ obj-$(CONFIG_BLK_DEV_BSG)	+= bsg.o
+ obj-$(CONFIG_BLK_DEV_BSGLIB)	+= bsg-lib.o
+diff --git a/block/blk-core.c b/block/blk-core.c
+index 33e2f62..f43ba8b 100644
+--- a/block/blk-core.c
++++ b/block/blk-core.c
+@@ -48,6 +48,17 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(block_unplug);
+ 
+ DEFINE_IDA(blk_queue_ida);
+ 
++#include <linux/time.h>
++#include "circular_queue.h"
++
++circular_queue blk_inspection_queue = {
++    .front = -1,
++    .rear = -1,
++};
++
++EXPORT_SYMBOL(blk_inspection_queue);
++EXPORT_SYMBOL(dequeue);
++
+ /*
+  * For the allocated request tables
+  */
+@@ -2108,7 +2119,17 @@ blk_qc_t submit_bio(int rw, struct bio *bio)
+ 			count = bio_sectors(bio);
+ 
+ 		if (rw & WRITE) {
++            char b[BDEVNAME_SIZE];
++            sector_info info;
++            struct timespec current_time = CURRENT_TIME;
++
+ 			count_vm_events(PGPGOUT, count);
++
++            info.number = (unsigned long long)bio->bi_iter.bi_sector;
++            info.procname = current->comm;
++            info.at = (int)current_time.tv_sec;
++            info.devname = bdevname(bio->bi_bdev, b);
++            enqueue(&blk_inspection_queue, &info);
+ 		} else {
+ 			task_io_account_read(bio->bi_iter.bi_size);
+ 			count_vm_events(PGPGIN, count);

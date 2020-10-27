@@ -16,7 +16,7 @@ static int my_open(struct inode* inode, struct file* file) {
 
 static ssize_t my_write(struct file* file, const char __user* user_buffer, size_t count, loff_t* ppos) {
   printk(KERN_INFO "Simple Module Write!!\n");
-  return 0;
+  return -1;
 }
 
 static const struct file_operations myproc_fops = {
