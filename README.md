@@ -11,7 +11,8 @@ WIP
 ## 커널 빌드하기
 
 1. 커널 소스에 패치 파일 적용 ([여기](https://twpower.github.io/195-how-to-apply-patch-file) 참고)
-2. 커널 빌드
+2. circular_queue 코드를 (src 폴더 내의) 커널 소스 내에 /block 안에 넣어두기
+3. 커널 빌드
 ```
 make bzImage -j4 && make modules -j4
 sudo make modules_install -j4 && sudo make install
