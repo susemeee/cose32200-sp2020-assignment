@@ -7,8 +7,10 @@
 #include "src/circular_queue.h"
 
 #define PROC_FILENAME "inspectfs"
+#define BUFFER_SIZE 10000
 
-#define BUFFER_SIZE 1000
+
+char buffer[BUFFER_SIZE];
 
 extern circular_queue blk_inspection_queue;
 
@@ -27,17 +29,16 @@ static ssize_t my_write(struct file* file, const char __user* user_buffer, size_
 static ssize_t my_read(struct file* file, char __user* user_buffer, size_t count, loff_t* ppos) {
 
     int buffer_length = 0;
-    char buffer[BUFFER_SIZE];
 	printk(KERN_INFO "procfile_read (/proc/%s) called\n", PROC_FILENAME);
 	
 	if (*ppos > 0 || count < BUFFER_SIZE) {
 		return 0;
 	} else {
 
-        sector_info* si;
-        while ((si = dequeue(&blk_inspection_queue)) != NULL) {
+        sector_info si;
+        while ((si = dequeue(&blk_inspection_queue)).is_valid != 0) {
 
-            buffer_length += sprintf(buffer + buffer_length, "[QUEUE] name=%s dev=%s sector_index=%llu at=%d\n", si->procname, si->devname, si->number, si->at);
+            buffer_length += sprintf(buffer + buffer_length, "[QUEUE] pid=%d dev=%s sector_index=%Lu at=%d\n", si.pid, si.devname, si.number, si.at);
 
         }
 
@@ -68,7 +69,7 @@ static int __init simple_init(void) {
 static void __exit simple_exit(void) {
   printk(KERN_INFO "Simple Module Exit!!\n");
 
-  remove_proc_entry(PROC_FILENAME, NULL);
+  proc_remove(proc_file);
   return;
 }
 

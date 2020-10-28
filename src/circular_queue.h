@@ -6,24 +6,26 @@
 #include <linux/types.h>
 
 #define QUEUE_SIZE 100
+#define BDEVNAME_SIZE 32
 
 typedef struct {
+  int is_valid;
   unsigned long long number;
-  const char* devname;
-  char* procname;
+  char devname[BDEVNAME_SIZE];
+  int pid;
   int at;
 } sector_info;
 
 typedef struct {
-  sector_info* q[QUEUE_SIZE];
+  sector_info q[QUEUE_SIZE];
   int rear;
   int front;
 } circular_queue;
 
 
-void enqueue(circular_queue* queue, sector_info* sector);
+void enqueue(circular_queue* queue, sector_info sector);
 
-sector_info* dequeue(circular_queue* queue);
+sector_info dequeue(circular_queue* queue);
 
 #endif
 
