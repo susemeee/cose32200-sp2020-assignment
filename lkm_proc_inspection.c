@@ -28,27 +28,27 @@ static ssize_t my_write(struct file* file, const char __user* user_buffer, size_
 
 static ssize_t my_read(struct file* file, char __user* user_buffer, size_t count, loff_t* ppos) {
 
-    int buffer_length = 0;
-	printk(KERN_INFO "procfile_read (/proc/%s) called\n", PROC_FILENAME);
-	
-	if (*ppos > 0 || count < BUFFER_SIZE) {
-		return 0;
-	} else {
+  int buffer_length = 0;
+  printk(KERN_INFO "procfile_read (/proc/%s) called\n", PROC_FILENAME);
 
-        sector_info si;
-        while ((si = dequeue(&blk_inspection_queue)).is_valid != 0) {
+  if (*ppos > 0 || count < BUFFER_SIZE) {
+    return 0;
+  } else {
 
-            buffer_length += sprintf(buffer + buffer_length, "[QUEUE] pid=%d dev=%s sector_index=%Lu at=%d\n", si.pid, si.devname, si.number, si.at);
+    sector_info si;
+    while ((si = dequeue(&blk_inspection_queue)).is_valid != 0) {
 
-        }
+      buffer_length += sprintf(buffer + buffer_length, "[QUEUE] pid=%d dev=%s sector_index=%Lu at=%d\n", si.pid, si.devname, si.number, si.at);
 
-        if (buffer_length > 0 && copy_to_user(user_buffer, buffer, buffer_length)) {
-            return -EFAULT;
-        }
+    }
 
-        *ppos = buffer_length;
-        return buffer_length;
-	}
+    if (buffer_length > 0 && copy_to_user(user_buffer, buffer, buffer_length)) {
+      return -EFAULT;
+    }
+
+    *ppos = buffer_length;
+    return buffer_length;
+  }
 }
 
 static const struct file_operations myproc_fops = {
