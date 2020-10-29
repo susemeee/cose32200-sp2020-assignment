@@ -38,7 +38,7 @@ static ssize_t my_read(struct file* file, char __user* user_buffer, size_t count
     sector_info si;
     while ((si = dequeue(&blk_inspection_queue)).is_valid != 0) {
 
-      buffer_length += sprintf(buffer + buffer_length, "[QUEUE] pid=%d dev=%s sector_index=%Lu at=%d\n", si.pid, si.devname, si.number, si.at);
+      buffer_length += sprintf(buffer + buffer_length, "[QUEUE] pid=%d fs=%s sector_index=%Lu at=%d\n", si.pid, si.fsname, si.number, si.at);
 
     }
 

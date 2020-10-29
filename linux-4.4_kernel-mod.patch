@@ -12,7 +12,7 @@ index 00ecc97..96c346f 100644
  obj-$(CONFIG_BLK_DEV_BSG)	+= bsg.o
  obj-$(CONFIG_BLK_DEV_BSGLIB)	+= bsg-lib.o
 diff --git a/block/blk-core.c b/block/blk-core.c
-index 33e2f62..86a5286 100644
+index 33e2f62..c035e50 100644
 --- a/block/blk-core.c
 +++ b/block/blk-core.c
 @@ -48,6 +48,17 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(block_unplug);
@@ -33,13 +33,13 @@ index 33e2f62..86a5286 100644
  /*
   * For the allocated request tables
   */
-@@ -2108,8 +2119,19 @@ blk_qc_t submit_bio(int rw, struct bio *bio)
+@@ -2108,8 +2119,23 @@ blk_qc_t submit_bio(int rw, struct bio *bio)
  			count = bio_sectors(bio);
  
  		if (rw & WRITE) {
-+            char b[BDEVNAME_SIZE];
 +            sector_info info;
 +            struct timespec current_time = CURRENT_TIME_SEC;
++            struct super_block* superblock = bio->bi_bdev->bd_super;
 +
  			count_vm_events(PGPGOUT, count);
 -		} else {
@@ -48,7 +48,11 @@ index 33e2f62..86a5286 100644
 +            info.number = (unsigned long long)bio->bi_iter.bi_sector;
 +            info.pid = task_pid_nr(current);
 +            info.at = (int)current_time.tv_sec;
-+            strncpy(info.devname, bdevname(bio->bi_bdev, b), BDEVNAME_SIZE);
++            if (superblock != NULL) {
++                info.fsname = superblock->s_type->name;
++            } else {
++                info.fsname = "???";
++            }
 +            enqueue(&blk_inspection_queue, info);
 +        } else {
  			task_io_account_read(bio->bi_iter.bi_size);

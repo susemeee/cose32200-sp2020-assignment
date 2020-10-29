@@ -6,12 +6,11 @@
 #include <linux/types.h>
 
 #define QUEUE_SIZE 100
-#define BDEVNAME_SIZE 32
 
 typedef struct {
   int is_valid;
   unsigned long long number;
-  char devname[BDEVNAME_SIZE];
+  const char* fsname;
   int pid;
   int at;
 } sector_info;
