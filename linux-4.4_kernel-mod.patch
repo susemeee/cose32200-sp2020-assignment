@@ -32,8 +32,8 @@ index 33e2f62..c035e50 100644
 +EXPORT_SYMBOL(dequeue);
 +
  /*
-	* For the allocated request tables
-	*/
+  * For the allocated request tables
+  */
 @@ -2108,8 +2119,23 @@ blk_qc_t submit_bio(int rw, struct bio *bio)
  			count = bio_sectors(bio);
  
