@@ -12,13 +12,14 @@ index 00ecc97..96c346f 100644
  obj-$(CONFIG_BLK_DEV_BSG)	+= bsg.o
  obj-$(CONFIG_BLK_DEV_BSGLIB)	+= bsg-lib.o
 diff --git a/block/blk-core.c b/block/blk-core.c
-index 33e2f62..c035e50 100644
+index 33e2f62..6e72af8 100644
 --- a/block/blk-core.c
 +++ b/block/blk-core.c
-@@ -48,6 +48,17 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(block_unplug);
+@@ -48,6 +48,19 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(block_unplug);
  
  DEFINE_IDA(blk_queue_ida);
  
++// 필요한 헤더 include
 +#include <linux/time.h>
 +#include "circular_queue.h"
 +
@@ -34,7 +35,7 @@ index 33e2f62..c035e50 100644
  /*
   * For the allocated request tables
   */
-@@ -2108,8 +2119,23 @@ blk_qc_t submit_bio(int rw, struct bio *bio)
+@@ -2108,7 +2121,26 @@ blk_qc_t submit_bio(int rw, struct bio *bio)
  			count = bio_sectors(bio);
  
  		if (rw & WRITE) {
@@ -45,7 +46,6 @@ index 33e2f62..c035e50 100644
 +			struct super_block* superblock = bio->bi_bdev->bd_super;
 +
  			count_vm_events(PGPGOUT, count);
--		} else {
 +
 +			info.is_valid = 1;
 +			info.number = (unsigned long long)bio->bi_iter.bi_sector;
@@ -58,7 +58,7 @@ index 33e2f62..c035e50 100644
 +				info.fsname = "???";
 +			}
 +			enqueue(&blk_inspection_queue, info);
-+		} else {
++
+ 		} else {
  			task_io_account_read(bio->bi_iter.bi_size);
  			count_vm_events(PGPGIN, count);
- 		}
