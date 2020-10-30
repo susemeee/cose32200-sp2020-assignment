@@ -5,7 +5,7 @@
 #include <linux/kernel.h>
 #include <linux/types.h>
 
-#define QUEUE_SIZE 100
+#define QUEUE_SIZE 1000
 
 /**
  * sector_info: write 작업을 했을 때의 작업에 대한 정보를 정의하는 구조체
