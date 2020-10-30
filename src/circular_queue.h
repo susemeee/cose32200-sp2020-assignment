@@ -5,7 +5,7 @@
 #include <linux/kernel.h>
 #include <linux/types.h>
 
-#define QUEUE_SIZE 5000
+#define QUEUE_SIZE 100
 
 /**
  * sector_info: write 작업을 했을 때의 작업에 대한 정보를 정의하는 구조체
@@ -20,7 +20,7 @@ typedef struct {
   /** write를 한 process pid */
   int pid;
   /** write가 이루어진 시각의 timestamp */
-  long at;
+  s64 at;
 } sector_info;
 
 /**

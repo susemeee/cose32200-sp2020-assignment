@@ -12,7 +12,7 @@ index 00ecc97..96c346f 100644
  obj-$(CONFIG_BLK_DEV_BSG)	+= bsg.o
  obj-$(CONFIG_BLK_DEV_BSGLIB)	+= bsg-lib.o
 diff --git a/block/blk-core.c b/block/blk-core.c
-index 33e2f62..bc7e692 100644
+index 33e2f62..68fc1a4 100644
 --- a/block/blk-core.c
 +++ b/block/blk-core.c
 @@ -48,6 +48,19 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(block_unplug);
@@ -41,7 +41,7 @@ index 33e2f62..bc7e692 100644
  		if (rw & WRITE) {
 +			sector_info info;
 +			// 현재 시각 정보를 초 단위로 반환 (tv_sec에 저장)
-+			struct timespec current_time = CURRENT_TIME;
++			ktime_t ktime = ktime_get();
 +			// write가 이루어진 device의 file system 이름을 가져오기 위해, bio device의 superblock을 참조
 +			struct super_block* superblock = bio->bi_bdev->bd_super;
 +
@@ -50,7 +50,7 @@ index 33e2f62..bc7e692 100644
 +			info.is_valid = 1;
 +			info.number = (unsigned long long)bio->bi_iter.bi_sector;
 +			info.pid = task_pid_nr(current);
-+			info.at = current_time.tv_nsec;
++			info.at = ktime_to_ns(ktime);
 +			// bd_super가 없는 경우 (null pointer) 에 대한 예외처리
 +			if (superblock != NULL) {
 +				info.fsname = superblock->s_type->name;
