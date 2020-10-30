@@ -102,7 +102,41 @@ enqueue(&blk_inspection_queue, info);
 
 ### 3. LKM 코드 (lkm_proc_inspection.c)
 
-WIP
+LKM에서는 proc file을 read해올 때의 callback을 주요하게 사용합니다. callback 함수를 proc_read라는 이름으로 정의 후 이에 대한 참조를 file_operations.read에 추가하여 proc_create를 할 때 같이 넘겨줍니다. proc_read 함수가 호출될 때, 커널 스페이스에 있는 blk_inspection_queue를 extern으로 참조하여 dequeue합니다. dequeue를 하면서 sector_info 구조체 내의 정보를 문자열 형식으로 포맷팅하여(sprintf) 버퍼에 넣어주고, 모두 dequeue가 되었다면 커널 스페이스에 있는 버퍼를 copy_to_user 함수를 통해 유저 스페이스로 복사합니다. 복사한 후에는 내용을 얼마만큼 읽어야하는지를 	ssize_t 형태로 리턴합니다. 만약 복사가 정상적으로 이루어지지 않았다면, -EFAULT를 리턴하여 예외 케이스를 핸들링합니다.
+
+```c
+static ssize_t proc_read(struct file* file, char __user* user_buffer, size_t count, loff_t* ppos) {
+
+  int buffer_length = 0;
+  printk(KERN_INFO "procfile_read (/proc/%s) called\n", PROC_FILENAME);
+
+  if (*ppos > 0 || count < BUFFER_SIZE) {
+    // user가 처음 read를 한 케이스가 아니거나(ppos > 0), read count가 buffer size보다 작을 경우, EOF(0)를 리턴한다.
+    return 0;
+  } else {
+
+    sector_info si;
+    // 커널 스페이스에 있는 blk_inspection_queue에서 sector_info를 dequeue 해온다.
+    while ((si = dequeue(&blk_inspection_queue)).is_valid != 0) {
+      // sector_info가 커널 코드에서 잘 채워졌다면(is_valid == 1), sector_info에 저장되어있던 값을 string으로 기록한다.
+      buffer_length += sprintf(buffer + buffer_length, "[QUEUE] pid=%d fs=%s sector_index=%Lu at=%lld\n", si.pid, si.fsname, si.number, si.at);
+
+    }
+    // kernel -> user space로 buffer를 복사한다. 실패할 경우 segfault
+    if (buffer_length > 0 && copy_to_user(user_buffer, buffer, buffer_length)) {
+      return -EFAULT;
+    }
+
+    // read seek position을 buffer_length만큼 이동
+    *ppos = buffer_length;
+    return buffer_length;
+  }
+}
+```
+
+### 어려웠던 부분
+
+프로그래밍을 할 때, 먼저, Linux 커널에 대해 체계적으로 정리된 문서가 없어 소스 코드를 보고 자료구조의 형식이나 함수의 반환값, argument 등에 대한 정보를 알아내야 한다는 어려움이 있었습니다. 또한, Linux 커널 버전에 따라 구현이나 정의가 다른 부분이 많았습니다. 예를 들면, 최신 버전의 Linux 커널에서는 bio 구조체에서 bi_bdev가 deprecated되어 사용하지 않았습니다. 또한, kernel time을 핸들링하는 부분도 최신 버전은 64비트 정수를 사용하고 있어, 4.4버전에 맞는 문서화나 예제 코드 등을 찾아내야한다는 어려움이 있었습니다.
 
 ## 빌드하기
 
