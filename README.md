@@ -79,6 +79,7 @@ write가 이루어지는 submit_bio 부분의 수정사항입니다. circular qu
 - pid: task_pid_nr() 함수를 통해 현재 process의 pid를 가져옴
 - number: bio 구조체의 bi_iter 멤버를 통해 bvec_iter 구조체를 가져온 후, 이의 bi_sector를 가져옴
 - at: ktime_get()을 통해 nanosecond 단위의 ktime_t 변수를 가져온 후, 이를 ktime_to_ns() 함수를 통해 signed 64bit 형식의 정수로 변환
+- fsname: bio->bi_bdev->bd_super를 통해 device의 superblock을 참조한 후, superblock의 s_type->name을 통해 파일 시스템 이름 저장. bd_super는 null pointer일 수 있어 이를 예외처리함
 
 ```c
 sector_info info;
