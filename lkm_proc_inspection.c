@@ -46,7 +46,7 @@ static ssize_t proc_read(struct file* file, char __user* user_buffer, size_t cou
     // 커널 스페이스에 있는 blk_inspection_queue에서 sector_info를 dequeue 해온다.
     while ((si = dequeue(&blk_inspection_queue)).is_valid != 0) {
       // sector_info가 커널 코드에서 잘 채워졌다면(is_valid == 1), sector_info에 저장되어있던 값을 string으로 기록한다.
-      buffer_length += sprintf(buffer + buffer_length, "[QUEUE] pid=%d fs=%s sector_index=%Lu at=%d\n", si.pid, si.fsname, si.number, si.at);
+      buffer_length += sprintf(buffer + buffer_length, "[QUEUE] pid=%d fs=%s sector_index=%Lu at=%ld\n", si.pid, si.fsname, si.number, si.at);
 
     }
     // kernel -> user space로 buffer를 복사한다. 실패할 경우 segfault

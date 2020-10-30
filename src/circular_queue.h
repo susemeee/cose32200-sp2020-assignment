@@ -20,7 +20,7 @@ typedef struct {
   /** write를 한 process pid */
   int pid;
   /** write가 이루어진 시각의 timestamp */
-  int at;
+  long at;
 } sector_info;
 
 /**
