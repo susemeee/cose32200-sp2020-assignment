@@ -56,7 +56,7 @@ obj-$(CONFIG_BLOCK) += circular_queue.o
 ```
 
 
-3. block/blk-core.c 소스코드 수정사항
+2. block/blk-core.c 소스코드 수정사항
 
 blk-core.c 소스코드에는 실험 데이터를 담을 수 있는 circular queue 자료구조를 blk_inspection_queue라는 변수명으로 선언하였습니다. blk_inspection_queue와 dequeue 함수는 LKM에서 참조하여 사용하기 때문에, EXPORT_SYMBOL 함수를 통하여 symbol을 사용할 수 있도록 export 해주었습니다.
 
