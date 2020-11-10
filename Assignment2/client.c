@@ -42,7 +42,7 @@ void* socket_client_routine(void* data) {
   char buffer[READ_BUFFER_SIZE] = {0};
   // read() 수행 후 읽은만큼을 전달
   int read_count = 0;
-  // read() 수행 후 '@'의 발생 빈도
+  // '@'의 발생 빈도
   int atsign_count = 0;
 
   int socket = client->socket;
@@ -52,7 +52,7 @@ void* socket_client_routine(void* data) {
     // read 수행
     read_count = read(socket, buffer, READ_BUFFER_SIZE);
     // '@' 빈도 카운트
-    atsign_count = atsign_counting(buffer, read_count);
+    atsign_count += atsign_counting(buffer, read_count);
 
     // fprintf(fp, "%02d:%02d:%02d.%03d|%d|%d|%s\n", hour, minute, second, millisec, len, buffer)
     printf("%s (from %d)\n", buffer, port);
@@ -60,6 +60,8 @@ void* socket_client_routine(void* data) {
     // '@'가 5개 이상이면 루프 종료
     if (atsign_count >= 5) {
       break;
+    } else {
+      atsign_count = 0;
     }
   }
 
@@ -70,7 +72,7 @@ void* socket_client_routine(void* data) {
 int main(int argc, const char* argv[]) {
 
   // pthread들을 담는 배열 변수
-  pthread_t p_threads[MAX_THREADS];
+  pthread_t p_threads[MAX_THREADS] = {0,};
   // pthread_join에서 사용하는 변수. 사용되지는 않음.
   int status;
 
