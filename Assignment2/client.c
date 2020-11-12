@@ -74,11 +74,11 @@ void* socket_client_routine(void* data) {
 
   // 로그 텍스트파일 제목
   char textT[20] = {};
-  sprintf(textT, "%d-%d.txt", port,socket);
+  sprintf(textT, "%d-%d.txt", port, sock);
 
   while (1) {
     // read 수행
-    read_count = read(socket, buffer, READ_BUFFER_SIZE);
+    read_count = read(sock, buffer, READ_BUFFER_SIZE);
     // '@' 빈도 카운트
     atsign_count += atsign_counting(buffer, read_count);
 
