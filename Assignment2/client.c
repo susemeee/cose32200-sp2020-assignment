@@ -12,14 +12,16 @@
 #include <unistd.h>
 
 #define READ_BUFFER_SIZE 1024
-// 최대로 지원하는 포트 번호
-#define MAX_PORTS_COUNT 10
-// 한 포트 번호로 동시에 접속할 커넥션의 갯수. 과제에서는 5
-#define CONCURRENT_CONNECTIONS_COUNT 5
-// pthread 배열의 크기
-const int MAX_THREADS = MAX_PORTS_COUNT * CONCURRENT_CONNECTIONS_COUNT;
-
+#define MAX_THREADS 10
 #define IP_ADDRESS "192.168.56.101"
+
+/** pthread가 실행할 함수에 전달할 구조체 */
+typedef struct {
+  // client가 접속한 포트 번호
+  int port;
+  // client socket
+  int socket;
+} socket_client;
 
 
 int atsign_counting(const char* buf, size_t len) {
@@ -43,32 +45,9 @@ void* socket_client_routine(void* data) {
   int read_count = 0;
   // '@'의 발생 빈도
   int atsign_count = 0;
-  // 포트 번호 data로부터 unboxing
-  int port = *(int*)data;
 
-  // socket 생성
-  int sock = 0;
-  struct sockaddr_in serv_addr;
-  serv_addr.sin_family = AF_INET;
-  serv_addr.sin_port = htons(port);
-
-  // socket 생성 실패시 예외처리
-  if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-    printf("Socket creation error\n");
-    return -1;
-  }
-
-  // address가 올바르지 않은 경우 예외처리
-  if (inet_pton(AF_INET, IP_ADDRESS, &serv_addr.sin_addr) <= 0) {
-    printf("Invalid address\n");
-    return -1;
-  }
-
-  // 해당 포트번호로 client가 접속 실패시 예외처리
-  if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
-    printf("%d: Connection Failed\n", port);
-    return -1;
-  }
+  int socket = client->socket;
+  int port = client->port;
 
   // 현재시간 측정을 위한 구조체
   struct timeb timebuffer;
@@ -143,20 +122,45 @@ int main(int argc, const char* argv[]) {
       continue;
     }
 
-    // CONCURRENT_CONNECTIONS_COUNT만큼 한 포트에 동시접속을 하기 위하여, thread 생성
-    for (int i = 0; i < CONCURRENT_CONNECTIONS_COUNT; i++) {
-      // thread 생성
-      int th_id = pthread_create(&p_threads[i - 1], NULL, socket_client_routine, (void *)&port);
-      // thread 생성 실패시 예외처리
-      if (th_id < 0) {
-        printf("thread create error\n");
-        return -1;
-      }
+    // socket 생성
+    int sock = 0;
+    struct sockaddr_in serv_addr;
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_port = htons(port);
+    // socket 생성 실패시 예외처리
+    if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+      printf("Socket creation error\n");
+      return -1;
+    }
+
+    // address가 올바르지 않은 경우 예외처리
+    if (inet_pton(AF_INET, IP_ADDRESS, &serv_addr.sin_addr) <= 0) {
+      printf("Invalid address\n");
+      return -1;
+    }
+
+    // 해당 포트번호로 client가 접속 실패시 예외처리
+    if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+      printf("%d: Connection Failed\n", port);
+      continue;
+    }
+
+    socket_client client = {
+      .port = port,
+      .socket = sock,
+    };
+
+    // thread 생성
+    int th_id = pthread_create(&p_threads[i - 1], NULL, socket_client_routine, (void *)&client);
+    // thread 생성 실패시 예외처리
+    if (th_id < 0) {
+      perror("thread create error\n");
+      return -1;
     }
   }
 
   // thread가 모두 끝날때까지 대기
-  for (int i = 0; i < MAX_THREADS; i++) {
+  for (int i = 1; i < argc; i++) {
     // 해당 인덱스의 pthread가 없을수도 있어 예외처리
     if (p_threads[i - 1] != 0) {
       pthread_join(p_threads[i - 1], (void **)&status);
