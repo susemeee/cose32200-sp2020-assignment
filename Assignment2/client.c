@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <sys/timeb.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -12,7 +13,7 @@
 
 #define READ_BUFFER_SIZE 1024
 #define MAX_THREADS 10
-#define IP_ADDRESS "127.0.0.1"
+#define IP_ADDRESS "192.168.56.101"
 
 /** pthread가 실행할 함수에 전달할 구조체 */
 typedef struct {
@@ -48,13 +49,36 @@ void* socket_client_routine(void* data) {
   int socket = client->socket;
   int port = client->port;
 
+  // 현재시간 측정을 위한 구조체
+  struct timeb timebuffer;
+  struct tm *now;
+  time_t ltime;
+  int milisec;
+
+
+  FILE *fp;
+
+  // 로그 텍스트파일 제목
+  char textT[20] = {};
+  sprintf(textT, "%d-%d.txt", port,socket);
+
   while (1) {
     // read 수행
     read_count = read(socket, buffer, READ_BUFFER_SIZE);
     // '@' 빈도 카운트
     atsign_count += atsign_counting(buffer, read_count);
 
-    // fprintf(fp, "%02d:%02d:%02d.%03d|%d|%d|%s\n", hour, minute, second, millisec, len, buffer)
+    // 현재 밀리초 측정
+    ftime(&timebuffer);
+    ltime = timebuffer.time;
+    milisec = timebuffer.millitm;
+    now = localtime(&ltime);
+
+    // 과제결과 출력 형식
+    fp = fopen(textT,"a");
+    fprintf(fp, "%02d:%02d:%02d.%03d|%ld|%s\n", now->tm_hour, now->tm_min, now->tm_sec, milisec, strlen(buffer), buffer);
+    fclose(fp);
+
     printf("%s (from %d)\n", buffer, port);
 
     // '@'가 5개 이상이면 루프 종료
