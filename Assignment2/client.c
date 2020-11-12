@@ -11,18 +11,12 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 
+#define SUCCESS (void*)1
 #define READ_BUFFER_SIZE 1024
+// 최대 쓰레드(접속 가능한 커넥션)의 갯수
 #define MAX_THREADS 10
+// server의 IP 주소
 #define IP_ADDRESS "127.0.0.1"
-
-/** pthread가 실행할 함수에 전달할 구조체 */
-typedef struct {
-  // client가 접속한 포트 번호
-  int port;
-  // client socket
-  int socket;
-} socket_client;
-
 
 int atsign_counting(const char* buf, size_t len) {
   int i;
@@ -36,8 +30,31 @@ int atsign_counting(const char* buf, size_t len) {
 /** pthread가 실행할 함수 */
 void* socket_client_routine(void* data) {
 
-  // void pointer 형식의 데이터(pthread_create에서 전달함)를 socket_client 형식으로 unboxing함.
-  socket_client* client = (socket_client*)data;
+  // data로부터 port 번호를 가져옴
+  int port = *(int*)data;
+  // socket 생성
+  int sock = 0;
+  struct sockaddr_in serv_addr;
+  serv_addr.sin_family = AF_INET;
+  serv_addr.sin_port = htons(port);
+  // socket 생성 실패시 예외처리
+  if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+    printf("Socket creation error\n");
+    return NULL;
+  }
+
+  // address가 올바르지 않은 경우 예외처리
+  if (inet_pton(AF_INET, IP_ADDRESS, &serv_addr.sin_addr) <= 0) {
+    printf("Invalid address\n");
+    return NULL;
+  }
+
+  // 해당 포트번호로 client가 접속 실패시 예외처리
+  if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+    printf("%d: Connection Failed\n", port);
+    return NULL;
+  }
+
 
   // read()를 수행할 문자열 버퍼
   char buffer[READ_BUFFER_SIZE] = {0};
@@ -45,9 +62,6 @@ void* socket_client_routine(void* data) {
   int read_count = 0;
   // '@'의 발생 빈도
   int atsign_count = 0;
-
-  int socket = client->socket;
-  int port = client->port;
 
   // 현재시간 측정을 위한 구조체
   struct timeb timebuffer;
@@ -120,36 +134,8 @@ int main(int argc, const char* argv[]) {
       continue;
     }
 
-    // socket 생성
-    int sock = 0;
-    struct sockaddr_in serv_addr;
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_port = htons(port);
-    // socket 생성 실패시 예외처리
-    if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-      printf("Socket creation error\n");
-      return -1;
-    }
-
-    // address가 올바르지 않은 경우 예외처리
-    if (inet_pton(AF_INET, IP_ADDRESS, &serv_addr.sin_addr) <= 0) {
-      printf("Invalid address\n");
-      return -1;
-    }
-
-    // 해당 포트번호로 client가 접속 실패시 예외처리
-    if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
-      printf("%d: Connection Failed\n", port);
-      continue;
-    }
-
-    socket_client client = {
-      .port = port,
-      .socket = sock,
-    };
-
     // thread 생성
-    int th_id = pthread_create(&p_threads[i - 1], NULL, socket_client_routine, (void *)&client);
+    int th_id = pthread_create(&p_threads[i - 1], NULL, socket_client_routine, (void *)&port);
     // thread 생성 실패시 예외처리
     if (th_id < 0) {
       perror("thread create error\n");
