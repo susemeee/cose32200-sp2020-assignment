@@ -13,7 +13,7 @@
 
 #define READ_BUFFER_SIZE 1024
 #define MAX_THREADS 10
-#define IP_ADDRESS "192.168.56.101"
+#define IP_ADDRESS "127.0.0.1"
 
 /** pthread가 실행할 함수에 전달할 구조체 */
 typedef struct {
@@ -78,8 +78,6 @@ void* socket_client_routine(void* data) {
     fp = fopen(textT,"a");
     fprintf(fp, "%02d:%02d:%02d.%03d|%ld|%s\n", now->tm_hour, now->tm_min, now->tm_sec, milisec, strlen(buffer), buffer);
     fclose(fp);
-
-    printf("%s (from %d)\n", buffer, port);
 
     // '@'가 5개 이상이면 루프 종료
     if (atsign_count >= 5) {
