@@ -55,6 +55,8 @@ void* socket_client_routine(void* data) {
     return NULL;
   }
 
+  // 접속 성공시 알림
+  printf("%d: Connected\n", port);
 
   // read()를 수행할 문자열 버퍼
   char buffer[READ_BUFFER_SIZE] = {0};
@@ -101,7 +103,9 @@ void* socket_client_routine(void* data) {
     }
   }
 
-  return 0;
+  // 접속 종료시 알림
+  printf("%d: Connection closed\n", port);
+  return SUCCESS;
 }
 
 
@@ -138,7 +142,7 @@ int main(int argc, const char* argv[]) {
     int th_id = pthread_create(&p_threads[i - 1], NULL, socket_client_routine, (void *)&port);
     // thread 생성 실패시 예외처리
     if (th_id < 0) {
-      perror("thread create error\n");
+      printf("thread create error\n");
       return -1;
     }
   }
