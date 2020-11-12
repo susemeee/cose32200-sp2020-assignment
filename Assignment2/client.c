@@ -16,8 +16,8 @@
 #define MAX_PORTS_COUNT 10
 // 한 포트 번호로 동시에 접속할 커넥션의 갯수. 과제에서는 5
 #define CONCURRENT_CONNECTIONS_COUNT 5
-// pthread 배열의 크기(10*5)
-#define MAX_THREADS 50
+// pthread 배열의 크기
+const int MAX_THREADS = MAX_PORTS_COUNT * CONCURRENT_CONNECTIONS_COUNT;
 
 #define IP_ADDRESS "192.168.56.101"
 
@@ -33,6 +33,9 @@ int atsign_counting(const char* buf, size_t len) {
 
 /** pthread가 실행할 함수 */
 void* socket_client_routine(void* data) {
+
+  // void pointer 형식의 데이터(pthread_create에서 전달함)를 socket_client 형식으로 unboxing함.
+  socket_client* client = (socket_client*)data;
 
   // read()를 수행할 문자열 버퍼
   char buffer[READ_BUFFER_SIZE] = {0};
@@ -52,19 +55,19 @@ void* socket_client_routine(void* data) {
   // socket 생성 실패시 예외처리
   if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
     printf("Socket creation error\n");
-    return NULL;
+    return -1;
   }
 
   // address가 올바르지 않은 경우 예외처리
   if (inet_pton(AF_INET, IP_ADDRESS, &serv_addr.sin_addr) <= 0) {
     printf("Invalid address\n");
-    return NULL;
+    return -1;
   }
 
   // 해당 포트번호로 client가 접속 실패시 예외처리
   if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
     printf("%d: Connection Failed\n", port);
-    return NULL;
+    return -1;
   }
 
   // 현재시간 측정을 위한 구조체
@@ -78,11 +81,11 @@ void* socket_client_routine(void* data) {
 
   // 로그 텍스트파일 제목
   char textT[20] = {};
-  sprintf(textT, "%d-%d.txt", port, sock);
+  sprintf(textT, "%d-%d.txt", port,socket);
 
   while (1) {
     // read 수행
-    read_count = read(sock, buffer, READ_BUFFER_SIZE);
+    read_count = read(socket, buffer, READ_BUFFER_SIZE);
     // '@' 빈도 카운트
     atsign_count += atsign_counting(buffer, read_count);
 
@@ -107,7 +110,7 @@ void* socket_client_routine(void* data) {
     }
   }
 
-  return (void*)1;
+  return 0;
 }
 
 
