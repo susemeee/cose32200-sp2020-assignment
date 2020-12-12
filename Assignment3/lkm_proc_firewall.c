@@ -7,7 +7,7 @@
 #include <linux/netfilter.h>
 #include <asm/uaccess.h>
 
-
+#define BUFFER_SIZE 10000
 #define NETFILTER_RULES_MAX_LENGTH 1000
 
 #define PROC_DIRNAME "groupx"
@@ -20,111 +20,32 @@ static struct proc_dir_entry* proc_file_add;
 static struct proc_dir_entry* proc_file_del;
 static struct proc_dir_entry* proc_file_show;
 
+char proc_write_buffer[BUFFER_SIZE];
+char proc_read_buffer[BUFFER_SIZE];
+
+
 unsigned int as_addr_to_net(char *str) {
-  unsigned char arr[4]; sscanf(str, "%d.%d.%d.%d", &arr[0], &arr[1], &arr[2], &arr[3]);
+  unsigned int arr[4];
+  sscanf(str, "%d.%d.%d.%d", &arr[0], &arr[1], &arr[2], &arr[3]);
   return *(unsigned int *)arr;
 }
 
-char *as_net_to_addr(unsigned int addr, char str[]) {
+char* as_net_to_addr(unsigned int addr, char str[]) {
   char add[16];
   unsigned char a = ((unsigned char *)&addr)[0];
   unsigned char b = ((unsigned char *)&addr)[1];
   unsigned char c = ((unsigned char *)&addr)[2];
   unsigned char d = ((unsigned char *)&addr)[3];
-  sprintf(add, "%u.%u.%u.%u", a, b, c, d); sprintf(str, "%s", add);
+  sprintf(add, "%u.%u.%u.%u", a, b, c, d);
+  sprintf(str, "%s", add);
   return str;
 }
 
-enum PROC_WRITE_TYPE {
-  ADD,
-  DEL,
-};
+typedef enum {
+  PROC_WRITE_TYPE_ADD,
+  PROC_WRITE_TYPE_DEL,
+} PROC_WRITE_TYPE;
 
-/**
- * TODO: init_net에 대한 설명
- */
-extern struct net init_net;
-
-/**
- * TODO: nf_hook_ops에 대한 설명
- */
-static struct nf_hook_ops* hook_ops_pre = NULL;
-static struct nf_hook_ops* hook_ops_post = NULL;
-static struct nf_hook_ops* hook_ops_forward = NULL;
-
-/**
- * TODO: netfilter_hook_func에 대한 설명
- */
-static unsigned int _netfilter_hook_func(char rule_type, void* priv, struct sk_buff* skb, const struct nf_hook_state* state) {
-  if (!skb) {
-    return NF_ACCEPT;
-  }
-
-  // https://elixir.bootlin.com/linux/v4.4/source/include/linux/ip.h#L23
-  struct iphdr* ip_header = ip_hdr(skb);
-
-  if (ip_header == NULL) {
-    printk(KERN_WARNING "_netfilter_hook_func: ip_header is null!");
-    return NF_ACCEPT;
-  }
-
-  char* direction = skb->pkt_type == PACKET_OUTGOING ? "OUTBOUND" : "INBOUND";
-  char* saddr = as_net_to_addr(ntohs(ip_header->saddr));
-  char* daddr = as_net_to_addr(ntohs(ip_header->daddr));
-
-  /** TCP가 아닌 경우 */
-  if (ip_header->protocol != IPPROTO_TCP) {
-    return NF_ACCEPT;
-  }
-
-  struct tcphdr* tcp_header = tcp_hdr(skb);
-
-  if (tcp_header == NULL) {
-    printk(KERN_WARNING "_netfilter_hook_func: tcp_header is null!");
-    return NF_ACCEPT;
-  }
-
-  int sport = ntohs(tcphdr->src);
-  int dport = ntohs(tcphdr->dest);
-  int syn = tcp_header->th_flags & TH_SYN;
-  int fin = tcp_header->th_flags & TH_FIN;
-  int ack = tcp_header->th_flags & TH_ACK;
-  int rst = tcp_header->th_flags & TH_RST;
-
-
-  if (is_in_netfilter_rules(rule_type, dport)) {
-    /** type, protocol, sport, dport, saddr, daddr, tcp bit */
-    printk(KERN_INFO "DROP[%8s]: %d, %d, %d, %d, %d, %d%d%d%d", direction, ip_header->protocol, sport, dport, saddr, daddr, syn, fin, ack, rst);
-    return NF_DROP;
-  }
-
-  /** proxy */
-  if (is_in_netfilter_rules('P', dport)) {
-    ip_header->daddr = htons(as_addr_to_net("131.1.1.1"));
-    tcp_header->dest = tcp_header->src;
-    printk(KERN_INFO "PROXY[%8s]: %d, %d, %d, %d, %d, %d%d%d%d", direction, ip_header->protocol, sport, dport, saddr, daddr, syn, fin, ack, rst);
-    return NF_ACCEPT;
-  }
-
-  /** type, protocol, sport, dport, saddr, daddr, tcp bit */
-  printk(KERN_INFO "[%8s]: %d, %d, %d, %d, %d, %d%d%d%d", direction, ip_header->protocol, sport, dport, saddr, daddr, syn, fin, ack, rst);
-  return NF_ACCEPT;
-
-}
-
-static unsigned int netfilter_hook_func_pre(void* priv, struct sk_buff* skb, const struct nf_hook_state* state) {
-  return _netfilter_hook_func('I', priv, skb, state);
-}
-
-
-static unsigned int netfilter_hook_func_post(void* priv, struct sk_buff* skb, const struct nf_hook_state* state) {
-  return _netfilter_hook_func('O', priv, skb, state);
-}
-
-
-static unsigned int netfilter_hook_func_forward(void* priv, struct sk_buff* skb, const struct nf_hook_state* state) {
-  return _netfilter_hook_func('F', priv, skb, state);
-}
 
 typedef struct {
   /** index */
@@ -159,20 +80,22 @@ static int add_netfilter_rules(char rule_type, int port) {
   while (rules[i].is_active == 1) {
     i++;
   }
-  rules[i] = {
+
+  netfilter_rule rule ={
     .index = i,
     .rule_type = rule_type,
     .port = port,
     .is_active = 1,
   };
 
+  rules[i] = rule;
   return i;
 }
 
 /**
  * 특정 index의 Netfilter rule을 비활성화하는 함수
  */
-static int remove_netfilter_rules(int index) {
+static int remove_netfilter_rules(int i) {
   if (rules[i].is_active == 1) {
     rules[i].is_active = 0;
     return 0;
@@ -182,19 +105,133 @@ static int remove_netfilter_rules(int index) {
 }
 
 
-static ssize_t _proc_write(PROC_WRITE_TYPE type, struct file* file, const char __user* user_buffer, size_t count, loff_t* ppos) {
-  return -1;
+/**
+ * TODO: init_net에 대한 설명
+ */
+extern struct net init_net;
+
+/**
+ * TODO: nf_hook_ops에 대한 설명
+ */
+static struct nf_hook_ops* hook_ops_pre = NULL;
+static struct nf_hook_ops* hook_ops_post = NULL;
+static struct nf_hook_ops* hook_ops_forward = NULL;
+
+/**
+ * TODO: netfilter_hook_func에 대한 설명
+ */
+static unsigned int _netfilter_hook_func(char rule_type, void* priv, struct sk_buff* skb, const struct nf_hook_state* state) {
+
+  if (!skb) {
+    return NF_ACCEPT;
+  }
+
+  // https://elixir.bootlin.com/linux/v4.4/source/include/linux/ip.h#L23
+  struct iphdr* ip_header = ip_hdr(skb);
+
+  if (ip_header == NULL) {
+    printk(KERN_WARNING "_netfilter_hook_func: ip_header is null!");
+    return NF_ACCEPT;
+  }
+
+  char* direction = skb->pkt_type == PACKET_OUTGOING ? "OUTBOUND" : "INBOUND";
+  char saddr[16];
+  char daddr[16];
+  as_net_to_addr(ntohs(ip_header->saddr), saddr);
+  as_net_to_addr(ntohs(ip_header->daddr), daddr);
+
+  /** TCP가 아닌 경우 */
+  if (ip_header->protocol != IPPROTO_TCP) {
+    return NF_ACCEPT;
+  }
+
+  struct tcphdr* tcp_header = tcp_hdr(skb);
+
+  if (tcp_header == NULL) {
+    printk(KERN_WARNING "_netfilter_hook_func: tcp_header is null!");
+    return NF_ACCEPT;
+  }
+
+  int sport = ntohs(tcp_header->source);
+  int dport = ntohs(tcp_header->dest);
+  int syn = tcp_header->syn;
+  int fin = tcp_header->fin;
+  int ack = tcp_header->ack;
+  int rst = tcp_header->rst;
+
+
+  if (is_in_netfilter_rules(rule_type, dport) != 0) {
+    /** type, protocol, sport, dport, saddr, daddr, tcp bit */
+    printk(KERN_INFO "DROP[%8s]: %d, %d, %d, %s, %s, %d%d%d%d", direction, ip_header->protocol, sport, dport, saddr, daddr, syn, fin, ack, rst);
+    return NF_DROP;
+  }
+
+  /** proxy */
+  if (is_in_netfilter_rules('P', dport) != 0) {
+    ip_header->daddr = htons(as_addr_to_net("131.1.1.1"));
+    tcp_header->dest = tcp_header->source;
+    printk(KERN_INFO "PROXY[%8s]: %d, %d, %d, %s, %s, %d%d%d%d", direction, ip_header->protocol, sport, dport, saddr, daddr, syn, fin, ack, rst);
+    return NF_ACCEPT;
+  }
+
+  /** type, protocol, sport, dport, saddr, daddr, tcp bit */
+  printk(KERN_INFO "[%8s]: %d, %d, %d, %s, %s, %d%d%d%d", direction, ip_header->protocol, sport, dport, saddr, daddr, syn, fin, ack, rst);
+  return NF_ACCEPT;
+
+}
+
+static unsigned int netfilter_hook_func_pre(void* priv, struct sk_buff* skb, const struct nf_hook_state* state) {
+  return _netfilter_hook_func('I', priv, skb, state);
 }
 
 
-static ssize_t proc_write_add(struct file* file, const char __user* user_buffer, size_t count, loff_t* ppos) {
+static unsigned int netfilter_hook_func_post(void* priv, struct sk_buff* skb, const struct nf_hook_state* state) {
+  return _netfilter_hook_func('O', priv, skb, state);
+}
+
+
+static unsigned int netfilter_hook_func_forward(void* priv, struct sk_buff* skb, const struct nf_hook_state* state) {
+  return _netfilter_hook_func('F', priv, skb, state);
+}
+
+
+static ssize_t _proc_write(PROC_WRITE_TYPE type, struct file* file, const char __user *buf, size_t len, loff_t *ppos) {
+
+  char rule_type;
+  int port;
+  int index;
+
+  if (len > BUFFER_SIZE) {
+    len = BUFFER_SIZE;
+  }
+
+  if (len > 0 && copy_from_user(proc_read_buffer, buf, len)) {
+    return -EFAULT;
+  }
+
+  switch (type) {
+    case PROC_WRITE_TYPE_ADD:
+      sscanf(proc_read_buffer, "%c %d", &rule_type, &port);
+      add_netfilter_rules(rule_type, port);
+      break;
+    case PROC_WRITE_TYPE_DEL:
+      sscanf(proc_read_buffer, "%d", &index);
+      remove_netfilter_rules(index);
+      break;
+  }
+
+  return len;
+}
+
+
+static ssize_t proc_write_add(struct file* file, const char __user *buf, size_t len, loff_t *ppos) {
   printk(KERN_INFO "Firewall Module Add!!\n");
-  return _proc_write(PROC_WRITE_TYPE.ADD, file, user_buffer, count, ppos);
+  return _proc_write(PROC_WRITE_TYPE_ADD, file, buf, len, ppos);
 }
 
-static ssize_t proc_write_del(struct file* file, const char __user* user_buffer, size_t count, loff_t* ppos) {
+static ssize_t proc_write_del(struct file* file, const char __user *buf, size_t len, loff_t *ppos) {
   printk(KERN_INFO "Firewall Module Del!!\n");
-  return _proc_write(PROC_WRITE_TYPE.DEL, file, user_buffer, count, ppos);
+  return _proc_write(PROC_WRITE_TYPE_DEL, file, buf, len, ppos);
 }
 
 /**
@@ -204,7 +241,6 @@ static ssize_t proc_write_del(struct file* file, const char __user* user_buffer,
 static ssize_t proc_show_read(struct file* file, char __user* user_buffer, size_t count, loff_t* ppos) {
 
   int buffer_length = 0;
-  printk(KERN_INFO "procfile_read (/proc/%s) called\n", PROC_FILENAME);
 
   if (*ppos > 0 || count < BUFFER_SIZE) {
     // user가 처음 read를 한 케이스가 아니거나(ppos > 0), read count가 buffer size보다 작을 경우, EOF(0)를 리턴한다.
@@ -215,12 +251,12 @@ static ssize_t proc_show_read(struct file* file, char __user* user_buffer, size_
     do {
       netfilter_rule rule = rules[i];
       if (rule.is_active == 1) {
-        buffer_length += sprintf(buffer + buffer_length, "%d(%c): %d\n", rule.index, rule.rule_type, .port);
+        buffer_length += sprintf(proc_write_buffer + buffer_length, "%d(%c): %d\n", rule.index, rule.rule_type, rule.port);
       }
     } while (rules[i].index != -1);
 
     // kernel -> user space로 buffer를 복사한다. 실패할 경우 segfault
-    if (buffer_length > 0 && copy_to_user(user_buffer, buffer, buffer_length)) {
+    if (buffer_length > 0 && copy_to_user(user_buffer, proc_write_buffer, buffer_length)) {
       return -EFAULT;
     }
 
@@ -262,14 +298,14 @@ static int __init firewall_module_init(void) {
   proc_file_show = proc_create(PROC_FILENAME_SHOW, 0600, proc_dir, &fops_show_read);
 
   /** 메모리 동적 할당*/
-  hook_ops_pre = (struct nf_hook_ops*)kmalloc(sizeof(struct nf_hook_ops));
-  hook_ops_post = (struct nf_hook_ops*)kmalloc(sizeof(struct nf_hook_ops));
-  hook_ops_forward = (struct nf_hook_ops*)kmalloc(sizeof(struct nf_hook_ops));
+  hook_ops_pre = (struct nf_hook_ops*)kmalloc(sizeof(struct nf_hook_ops), GFP_KERNEL);
+  hook_ops_post = (struct nf_hook_ops*)kmalloc(sizeof(struct nf_hook_ops), GFP_KERNEL);
+  hook_ops_forward = (struct nf_hook_ops*)kmalloc(sizeof(struct nf_hook_ops), GFP_KERNEL);
 
   /** 콜백 함수 등록 */
-  hook_ops_pre->hook = (nf_hook_fn*)netfilter_hook_func_pre;
-  hook_ops_post->hook = (nf_hook_fn*)netfilter_hook_func_post;
-  hook_ops_forward->hook = (nf_hook_fn*)netfilter_hook_func_forward;
+  hook_ops_pre->hook = (nf_hookfn*)netfilter_hook_func_pre;
+  hook_ops_post->hook = (nf_hookfn*)netfilter_hook_func_post;
+  hook_ops_forward->hook = (nf_hookfn*)netfilter_hook_func_forward;
   /**
 https://elixir.bootlin.com/linux/v4.4/source/include/uapi/linux/netfilter.h#L46
 enum nf_inet_hooks {
