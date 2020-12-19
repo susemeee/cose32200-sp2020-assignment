@@ -143,8 +143,8 @@ static unsigned int _netfilter_hook_func(char rule_type, void* priv, struct sk_b
   char* direction = skb->pkt_type == PACKET_OUTGOING ? "OUTBOUND" : "INBOUND";
   char saddr[16];
   char daddr[16];
-  as_net_to_addr(ntohs(ip_header->saddr), saddr);
-  as_net_to_addr(ntohs(ip_header->daddr), daddr);
+  as_net_to_addr(ip_header->saddr, saddr);
+  as_net_to_addr(ip_header->daddr, daddr);
 
   /** TCP가 아닌 경우 */
   if (ip_header->protocol != IPPROTO_TCP) {
@@ -174,7 +174,7 @@ static unsigned int _netfilter_hook_func(char rule_type, void* priv, struct sk_b
 
   /** proxy */
   if (is_in_netfilter_rules('P', dport) != 0) {
-    ip_header->daddr = htons(as_addr_to_net("131.1.1.1"));
+    ip_header->daddr = as_addr_to_net("131.1.1.1");
     tcp_header->dest = tcp_header->source;
     printk(KERN_INFO "PROXY[%8s]: %d, %d, %d, %s, %s, %d%d%d%d", direction, ip_header->protocol, sport, dport, saddr, daddr, syn, fin, ack, rst);
     return NF_ACCEPT;
