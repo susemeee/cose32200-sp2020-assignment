@@ -330,9 +330,9 @@ enum nf_inet_hooks {
   hook_ops_forward->hooknum = NF_INET_FORWARD;
 
   /** register */
-  nf_register_net_hook(&init_net, hook_ops_pre);
-  nf_register_net_hook(&init_net, hook_ops_post);
-  nf_register_net_hook(&init_net, hook_ops_forward);
+  nf_register_hook(hook_ops_pre);
+  nf_register_hook(hook_ops_post);
+  nf_register_hook(hook_ops_forward);
 
   return 0;
 }
@@ -347,9 +347,9 @@ static void __exit firewall_module_exit(void) {
   proc_remove(proc_dir);
 
   /** unregister */
-  nf_unregister_net_hook(&init_net, hook_ops_pre);
-  nf_unregister_net_hook(&init_net, hook_ops_post);
-  nf_unregister_net_hook(&init_net, hook_ops_forward);
+  nf_unregister_hook(hook_ops_pre);
+  nf_unregister_hook(hook_ops_post);
+  nf_unregister_hook(hook_ops_forward);
 
   /** 메모리 할당 해제 */
   kfree(hook_ops_pre);
