@@ -191,10 +191,10 @@ static unsigned int _netfilter_hook_func(char rule_type, void* priv, struct sk_b
 
   /** proxy */
   if (is_in_netfilter_rules('P', sport) != 0) {
-    daddr = as_addr_to_net(FORWARD_NET_ADDR);
-    ip_header->daddr = daddr;
+    char* _daddr = FORWARD_NET_ADDR;
+    ip_header->daddr = as_addr_to_net(daddr);
     tcp_header->dest = tcp_header->source;
-    printk(KERN_INFO "PROXY[%8s]: %d, %d, %d, %s, %s, %d%d%d%d", direction, ip_header->protocol, sport, dport, saddr, daddr, syn, fin, ack, rst);
+    printk(KERN_INFO "PROXY[%8s]: %d, %d, %d, %s, %s, %d%d%d%d", direction, ip_header->protocol, sport, dport, saddr, _daddr, syn, fin, ack, rst);
     return NF_ACCEPT;
   }
 
