@@ -68,7 +68,7 @@ static netfilter_rule rules = {
   .list = LIST_HEAD_INIT(rules.list),
 };
 
-static int is_in_netfilter_rules(char rule_type, int dport) {
+static int is_in_netfilter_rules(char rule_type, int port) {
   netfilter_rule* rule = NULL;
   list_for_each_entry(rule, &rules.list, list) {
     if (rule != NULL && rule->is_active == 1 && rule->rule_type == rule_type && rule->port == port) {
