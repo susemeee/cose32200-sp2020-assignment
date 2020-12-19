@@ -10,7 +10,7 @@
 
 #define BUFFER_SIZE 10000
 
-#define PROC_DIRNAME "groupx"
+#define PROC_DIRNAME "group37"
 #define PROC_FILENAME_ADD "add"
 #define PROC_FILENAME_DEL "del"
 #define PROC_FILENAME_SHOW "show"
@@ -360,6 +360,6 @@ module_init(firewall_module_init);
 module_exit(firewall_module_exit);
 
 MODULE_DESCRIPTION("Firewall");
-MODULE_AUTHOR("SP2020 Group");
+MODULE_AUTHOR("SP2020 Group 37");
 MODULE_LICENSE("GPL");
 MODULE_VERSION("1.0.0");
