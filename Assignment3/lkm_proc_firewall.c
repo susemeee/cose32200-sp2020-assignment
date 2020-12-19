@@ -9,6 +9,7 @@
 #include <linux/netfilter_ipv4.h>
 #include <asm/uaccess.h>
 
+#define FORWARD_NET_ADDR "131.1.1.1"
 #define BUFFER_SIZE 10000
 
 #define PROC_DIRNAME "group37"
@@ -190,7 +191,7 @@ static unsigned int _netfilter_hook_func(char rule_type, void* priv, struct sk_b
 
   /** proxy */
   if (is_in_netfilter_rules('P', dport) != 0) {
-    ip_header->daddr = as_addr_to_net("131.1.1.1");
+    ip_header->daddr = as_addr_to_net(FORWARD_NET_ADDR);
     tcp_header->dest = tcp_header->source;
     printk(KERN_INFO "PROXY[%8s]: %d, %d, %d, %s, %s, %d%d%d%d", direction, ip_header->protocol, sport, dport, saddr, daddr, syn, fin, ack, rst);
     return NF_ACCEPT;
