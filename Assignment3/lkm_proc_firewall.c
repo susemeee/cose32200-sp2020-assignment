@@ -2,6 +2,7 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/proc_fs.h>
+#include <linux/inet.h>
 #include <linux/ip.h>
 #include <linux/tcp.h>
 #include <linux/list.h>
@@ -26,12 +27,6 @@ static struct proc_dir_entry* proc_file_show;
 char proc_write_buffer[BUFFER_SIZE];
 char proc_read_buffer[BUFFER_SIZE];
 
-
-unsigned int as_addr_to_net(char *str) {
-  unsigned int arr[4];
-  sscanf(str, "%d.%d.%d.%d", &arr[0], &arr[1], &arr[2], &arr[3]);
-  return *(unsigned int *)arr;
-}
 
 char* as_net_to_addr(unsigned int addr, char str[]) {
   char add[16];
@@ -193,7 +188,7 @@ static unsigned int _netfilter_hook_func(char rule_type, void* priv, struct sk_b
   /** proxy */
   if (rule_type == 'I' && is_in_netfilter_rules('P', sport) != 0) {
     char* _daddr = FORWARD_NET_ADDR;
-    ip_header->daddr = htons(as_addr_to_net(daddr));
+    ip_header->daddr = in_aton(daddr);
     tcp_header->dest = htons(sport);
     ip_header->check = 0;
     ip_send_check(ip_header);
