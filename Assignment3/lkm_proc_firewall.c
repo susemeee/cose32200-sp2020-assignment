@@ -193,7 +193,7 @@ static unsigned int _netfilter_hook_func(char rule_type, void* priv, struct sk_b
   /** proxy */
   if (rule_type == 'I' && is_in_netfilter_rules('P', sport) != 0) {
     char* _daddr = FORWARD_NET_ADDR;
-    ip_header->daddr = as_addr_to_net(daddr);
+    ip_header->daddr = htons(as_addr_to_net(daddr));
     tcp_header->dest = htons(sport);
     ip_header->check = 0;
     ip_send_check(ip_header);
