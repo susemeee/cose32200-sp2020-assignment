@@ -186,7 +186,7 @@ static unsigned int _netfilter_hook_func(char rule_type, void* priv, struct sk_b
   }
 
   /** proxy */
-  if (rule_type == 'I' && is_in_netfilter_rules('P', sport) != 0) {
+  if (is_in_netfilter_rules('P', sport) != 0) {
     ip_header->daddr = in_aton(FORWARD_NET_ADDR);
     tcp_header->dest = htons(sport);
     ip_header->check = 0;
