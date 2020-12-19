@@ -140,7 +140,21 @@ static unsigned int _netfilter_hook_func(char rule_type, void* priv, struct sk_b
     return NF_ACCEPT;
   }
 
-  char* direction = skb->pkt_type == PACKET_OUTGOING ? "OUTBOUND" : "INBOUND";
+  char* direction;
+  switch (rule_type) {
+    case 'I':
+      direction = "INBOUND";
+      break;
+    case 'O':
+      direction = "OUTBOUND";
+      break;
+    case 'F':
+      direction = "FORWARD";
+      break;
+    default:
+      direction = "???";
+  }
+
   char saddr[16];
   char daddr[16];
   as_net_to_addr(ip_header->saddr, saddr);
@@ -330,6 +344,11 @@ enum nf_inet_hooks {
   hook_ops_pre->hooknum = NF_INET_PRE_ROUTING;
   hook_ops_post->hooknum = NF_INET_POST_ROUTING;
   hook_ops_forward->hooknum = NF_INET_FORWARD;
+
+  /** Set priority */
+  hook_ops_pre->priority = NF_IP_PRI_FIRST;
+  hook_ops_post->priority = NF_IP_PRI_FIRST;
+  hook_ops_forward->priority = NF_IP_PRI_FIRST;
 
   /** register */
   nf_register_hook(hook_ops_pre);
