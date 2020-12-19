@@ -6,6 +6,7 @@
 #include <linux/tcp.h>
 #include <linux/list.h>
 #include <linux/netfilter.h>
+#include <linux/netfilter_ipv4.h>
 #include <asm/uaccess.h>
 
 #define BUFFER_SIZE 10000
