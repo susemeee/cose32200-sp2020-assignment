@@ -4,6 +4,7 @@
 #include <linux/proc_fs.h>
 #include <linux/ip.h>
 #include <linux/tcp.h>
+#include <linux/list.h>
 #include <linux/netfilter.h>
 #include <asm/uaccess.h>
 
@@ -58,17 +59,18 @@ typedef struct {
 
   struct list_head list;
 
-} netfilter_rule_list;
+} netfilter_rule;
 
-static netfilter_rule_list rules;
-/** list 초기화 */
-LIST_HEAD(rules);
-
+static netfilter_rule rules = {
+  .index = 0,
+  .is_active = 0,
+  .list = LIST_HEAD_INIT(rules.list),
+};
 
 static int is_in_netfilter_rules(char rule_type, int port) {
-  struct netfilter_rule_list* rule = NULL;
-  list_for_each(rule, rules) {
-    if (rule != NULL && rule.is_active == 1 && rule.rule_type == rule_type && rule.port == port) {
+  netfilter_rule* rule = NULL;
+  list_for_each_entry(rule, &(rules.list), list) {
+    if (rule != NULL && rule->is_active == 1 && rule->rule_type == rule_type && rule->port == port) {
       return 1;
     }
   }
@@ -77,28 +79,23 @@ static int is_in_netfilter_rules(char rule_type, int port) {
 
 static int add_netfilter_rules(char rule_type, int port) {
 
+  netfilter_rule* rule = list_last_entry(&rules.list, netfilter_rule, list);
+  int i = rule->index;
+
   if (rule_type != 'I' && rule_type != 'O' && rule_type != 'P' && rule_type != 'F') {
     printk(KERN_WARNING "add_netfilter_rules: Invalid rule type. Must be one of I, O, P, F.");
     return -1;
   }
 
-  int i = 0;
-  struct netfilter_rule_list* rule = NULL;
-  list_for_each(rule, rules) {
-    if (rule != NULL && rule.is_active != 0) {
-      i = rule.index;
-      continue;
-    }
-  }
 
-  netfilter_rule rule = {
+  netfilter_rule new_rule = {
     .index = i + 1,
     .rule_type = rule_type,
     .port = port,
     .is_active = 1,
+    .list = LIST_HEAD_INIT(new_rule.list),
   };
-
-  list_add(&rule.list, &rule);
+  list_add(&new_rule.list, &rule->list);
   return i;
 }
 
@@ -106,10 +103,11 @@ static int add_netfilter_rules(char rule_type, int port) {
  * 특정 index의 Netfilter rule을 비활성화하는 함수
  */
 static void remove_netfilter_rules(int i) {
-  struct netfilter_rule_list* rule = NULL;
-  list_for_each(rule, rules) {
-    if (rule != NULL && rule.index == i) {
-      rule.is_active = 0;
+
+  netfilter_rule* rule = NULL;
+  list_for_each_entry(rule, &(rules.list), list) {
+    if (rule != NULL && rule->index == i) {
+      rule->is_active = 0;
     }
   }
 }
@@ -257,11 +255,11 @@ static ssize_t proc_show_read(struct file* file, char __user* user_buffer, size_
     return 0;
   } else {
 
-    struct netfilter_rule_list* rule = NULL;
-    list_for_each(rule, rules)
+    netfilter_rule* rule = NULL;
+    list_for_each_entry(rule, &(rules.list), list)
     {
-      if (rule != NULL && rule.is_active == 1) {
-        buffer_length += sprintf(proc_write_buffer + buffer_length, "%d(%c): %d\n", rule.index, rule.rule_type, rule.port);
+      if (rule != NULL && rule->is_active == 1) {
+        buffer_length += sprintf(proc_write_buffer + buffer_length, "%d(%c): %d\n", rule->index, rule->rule_type, rule->port);
       }
     }
 
