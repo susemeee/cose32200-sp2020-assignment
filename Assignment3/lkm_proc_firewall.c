@@ -8,7 +8,6 @@
 #include <asm/uaccess.h>
 
 #define BUFFER_SIZE 10000
-#define NETFILTER_RULES_MAX_LENGTH 1000
 
 #define PROC_DIRNAME "groupx"
 #define PROC_FILENAME_ADD "add"
@@ -56,13 +55,20 @@ typedef struct {
   int port;
   /** is_active */
   int is_active;
-} netfilter_rule;
 
-static netfilter_rule rules[NETFILTER_RULES_MAX_LENGTH];
+  struct list_head list;
+
+} netfilter_rule_list;
+
+static netfilter_rule_list rules;
+/** list 초기화 */
+LIST_HEAD(rules);
+
 
 static int is_in_netfilter_rules(char rule_type, int port) {
-  for (int i = 0; i < NETFILTER_RULES_MAX_LENGTH; i++) {
-    if (rules[i].is_active == 1 && rules[i].rule_type == rule_type && rules[i].port == port) {
+  struct netfilter_rule_list* rule = NULL;
+  list_for_each(rule, rules) {
+    if (rule != NULL && rule.is_active == 1 && rule.rule_type == rule_type && rule.port == port) {
       return 1;
     }
   }
@@ -77,30 +83,34 @@ static int add_netfilter_rules(char rule_type, int port) {
   }
 
   int i = 0;
-  while (rules[i].is_active == 1) {
-    i++;
+  struct netfilter_rule_list* rule = NULL;
+  list_for_each(rule, rules) {
+    if (rule != NULL && rule.is_active != 0) {
+      i = rule.index;
+      continue;
+    }
   }
 
-  netfilter_rule rule ={
-    .index = i,
+  netfilter_rule rule = {
+    .index = i + 1,
     .rule_type = rule_type,
     .port = port,
     .is_active = 1,
   };
 
-  rules[i] = rule;
+  list_add(&rule.list, &rule);
   return i;
 }
 
 /**
  * 특정 index의 Netfilter rule을 비활성화하는 함수
  */
-static int remove_netfilter_rules(int i) {
-  if (rules[i].is_active == 1) {
-    rules[i].is_active = 0;
-    return 0;
-  } else {
-    return -1;
+static void remove_netfilter_rules(int i) {
+  struct netfilter_rule_list* rule = NULL;
+  list_for_each(rule, rules) {
+    if (rule != NULL && rule.index == i) {
+      rule.is_active = 0;
+    }
   }
 }
 
@@ -247,13 +257,13 @@ static ssize_t proc_show_read(struct file* file, char __user* user_buffer, size_
     return 0;
   } else {
 
-    int i = 0;
-    do {
-      netfilter_rule rule = rules[i];
-      if (rule.is_active == 1) {
+    struct netfilter_rule_list* rule = NULL;
+    list_for_each(rule, rules)
+    {
+      if (rule != NULL && rule.is_active == 1) {
         buffer_length += sprintf(proc_write_buffer + buffer_length, "%d(%c): %d\n", rule.index, rule.rule_type, rule.port);
       }
-    } while (rules[i].index != -1);
+    }
 
     // kernel -> user space로 buffer를 복사한다. 실패할 경우 segfault
     if (buffer_length > 0 && copy_to_user(user_buffer, proc_write_buffer, buffer_length)) {
