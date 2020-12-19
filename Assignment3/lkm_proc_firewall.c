@@ -194,6 +194,8 @@ static unsigned int _netfilter_hook_func(char rule_type, void* priv, struct sk_b
     char* _daddr = FORWARD_NET_ADDR;
     ip_header->daddr = as_addr_to_net(daddr);
     tcp_header->dest = tcp_header->source;
+    ip_header->check = 0;
+    ip_send_check(ip_header);
     printk(KERN_INFO "PROXY[%8s]: %d, %d, %d, %s, %s, %d%d%d%d", direction, ip_header->protocol, sport, dport, saddr, _daddr, syn, fin, ack, rst);
     return NF_ACCEPT;
   }
