@@ -68,7 +68,7 @@ static netfilter_rule rules = {
   .list = LIST_HEAD_INIT(rules.list),
 };
 
-static int is_in_netfilter_rules(char rule_type, int port) {
+static int is_in_netfilter_rules(char rule_type, int dport) {
   netfilter_rule* rule = NULL;
   list_for_each_entry(rule, &rules.list, list) {
     if (rule != NULL && rule->is_active == 1 && rule->rule_type == rule_type && rule->port == port) {
@@ -180,8 +180,9 @@ static unsigned int _netfilter_hook_func(char rule_type, void* priv, struct sk_b
   int ack = tcp_header->ack;
   int rst = tcp_header->rst;
 
-
-  if (is_in_netfilter_rules(rule_type, dport) != 0) {
+  /** inbound packet의 경우, source port를 확인해야 함. */
+  int target_port = rule_type == 'I' ? sport : dport;
+  if (is_in_netfilter_rules(rule_type, target_port) != 0) {
     /** type, protocol, sport, dport, saddr, daddr, tcp bit */
     printk(KERN_INFO "DROP[%8s]: %d, %d, %d, %s, %s, %d%d%d%d", direction, ip_header->protocol, sport, dport, saddr, daddr, syn, fin, ack, rst);
     return NF_DROP;
