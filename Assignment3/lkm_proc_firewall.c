@@ -307,6 +307,11 @@ static int __init firewall_module_init(void) {
   hook_ops_post = (struct nf_hook_ops*)kmalloc(sizeof(struct nf_hook_ops), GFP_KERNEL);
   hook_ops_forward = (struct nf_hook_ops*)kmalloc(sizeof(struct nf_hook_ops), GFP_KERNEL);
 
+  /** PF_INET (IP) */
+  hook_ops_pre->pf = PF_INET;
+  hook_ops_post->pf = PF_INET;
+  hook_ops_forward->pf = PF_INET;
+
   /** 콜백 함수 등록 */
   hook_ops_pre->hook = (nf_hookfn*)netfilter_hook_func_pre;
   hook_ops_post->hook = (nf_hookfn*)netfilter_hook_func_post;
