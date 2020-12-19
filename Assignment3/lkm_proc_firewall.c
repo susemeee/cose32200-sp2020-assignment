@@ -7,6 +7,7 @@
 #include <linux/list.h>
 #include <linux/netfilter.h>
 #include <linux/netfilter_ipv4.h>
+#include <net/ip.h>
 #include <asm/uaccess.h>
 
 #define FORWARD_NET_ADDR "131.1.1.1"
