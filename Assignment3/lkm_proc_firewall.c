@@ -69,7 +69,7 @@ static netfilter_rule rules = {
 
 static int is_in_netfilter_rules(char rule_type, int port) {
   netfilter_rule* rule = NULL;
-  list_for_each_entry(rule, &(rules.list), list) {
+  list_for_each_entry(rule, &rules.list, list) {
     if (rule != NULL && rule->is_active == 1 && rule->rule_type == rule_type && rule->port == port) {
       return 1;
     }
@@ -87,15 +87,13 @@ static int add_netfilter_rules(char rule_type, int port) {
     return -1;
   }
 
-
-  netfilter_rule new_rule = {
-    .index = i + 1,
-    .rule_type = rule_type,
-    .port = port,
-    .is_active = 1,
-    .list = LIST_HEAD_INIT(new_rule.list),
-  };
-  list_add(&new_rule.list, &rule->list);
+  netfilter_rule* new_rule = (netfilter_rule*)kmalloc(sizeof(netfilter_rule), GFP_KERNEL);
+  new_rule->index = i + 1;
+  new_rule->rule_type = rule_type;
+  new_rule->port = port;
+  new_rule->is_active = 1;
+  INIT_LIST_HEAD(&new_rule->list);
+  list_add(&new_rule->list, &rule->list);
   return i;
 }
 
@@ -105,7 +103,7 @@ static int add_netfilter_rules(char rule_type, int port) {
 static void remove_netfilter_rules(int i) {
 
   netfilter_rule* rule = NULL;
-  list_for_each_entry(rule, &(rules.list), list) {
+  list_for_each_entry(rule, &rules.list, list) {
     if (rule != NULL && rule->index == i) {
       rule->is_active = 0;
     }
@@ -256,8 +254,7 @@ static ssize_t proc_show_read(struct file* file, char __user* user_buffer, size_
   } else {
 
     netfilter_rule* rule = NULL;
-    list_for_each_entry(rule, &(rules.list), list)
-    {
+    list_for_each_entry(rule, &rules.list, list) {
       if (rule != NULL && rule->is_active == 1) {
         buffer_length += sprintf(proc_write_buffer + buffer_length, "%d(%c): %d\n", rule->index, rule->rule_type, rule->port);
       }
