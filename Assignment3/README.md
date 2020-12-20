@@ -33,3 +33,7 @@ Proc file을 이용하여 rule을 추가 / 삭제하는 부분은 `proc_write_ad
 
 `remove_netfilter_rules` 함수에서는 사용하지 않는 rule을 삭제하는 로직을 구현해 두었습니다. 다만, 이 경우 실제 linked list에서 삭제할 rule entry를 직접 지우지 않고, `netfilter_rule` 구조체에 직접 선언한 `is_active` flag를 0으로 변경해 주었습니다. `is_active` flag가 0인 entry는 다른 로직에서 없는 rule과 마찬가지로 취급이 됩니다.
 
+## 어려웠던 부분과 해결책
+
+첫 번째로, Linux 커널에서 사용되는 list 구조체를 사용하는 부분을 이해하는게 어려운 부분 중 하나였습니다. list 구조체를 초기화하는 방법이 정적(compile-time)인 경우와 동적(run-time)인 경우가 서로 달라, 이 두 경우에 대한 차이를 확실히 이해한 후 list를 사용할 수 있었습니다. 또한 list를 다루는 함수들이 대부분 인라인 함수나 매크로 함수로 이루어져있어, 함수를 잘못 사용하였을 경우 어떤 부분이 틀렸는지를 디버깅하기 어려웠습니다.
+두 번째로, FORWARD Netfilter를 구현하기 위해 IP forwarding에 대한 개념과, 실험을 하기 위한 절차를 정확히 파악하는 과정에서 시간이 많이 들었습니다. 처음 구현 후 테스트했을 때 `NF_INET_FORWARD` 부분의 Hook이 동작하지 않았던 문제도 있었는데, sysctl을 이용해서 커널의 ip forwarding 기능을 활성화하는 절차를 진행하기 않아 로깅이 되지 않았었습니다. 이후 ip forwarding을 하기 위한 절차를 정확히 파악한 후 (route table, sysctl) 실험을 하여 문제를 해결할 수 있었습니다.
