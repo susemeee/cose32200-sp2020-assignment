@@ -27,7 +27,7 @@ static struct proc_dir_entry* proc_file_show;
 char proc_write_buffer[BUFFER_SIZE];
 char proc_read_buffer[BUFFER_SIZE];
 
-
+/** 실습 PPT에서 주어진 코드. as_addr_to_net은 in_aton 함수를 대신 사용. */
 char* as_net_to_addr(unsigned int addr, char str[]) {
   char add[16];
   unsigned char a = ((unsigned char *)&addr)[0];
@@ -46,25 +46,30 @@ typedef enum {
 
 
 typedef struct {
-  /** index */
+  /** Rule index */
   int index;
-  /** IOFP */
+  /** 방화벽 Rule type (I,O,F,P 중 하나가 들어감) */
   char rule_type;
-  /** 포트 번호 */
+  /** 방화벽 Rule의 포트 번호 */
   int port;
-  /** is_active */
+  /** 현재 이 방화벽 rule이 활성화된 상태인지? */
   int is_active;
-
+  /** linked list 구현을 위한 list_head */
   struct list_head list;
 
 } netfilter_rule;
 
+/** netfilter_rule을 저장하는 linked list */
 static netfilter_rule rules = {
   .index = 0,
   .is_active = 0,
+  /** 컴파일 타임에 list 메모리를 할당하는 함수를 호출 */
   .list = LIST_HEAD_INIT(rules.list),
 };
 
+/**
+ * 주어진 포트번호(port)가 rule_type 방화벽 rule을 가지고 있는지를 반환하는 함수
+ */
 static int is_in_netfilter_rules(char rule_type, int port) {
   netfilter_rule* rule = NULL;
   list_for_each_entry(rule, &rules.list, list) {
@@ -75,6 +80,9 @@ static int is_in_netfilter_rules(char rule_type, int port) {
   return 0;
 }
 
+/**
+ * 주어진 포트번호에 rule_type rule을 추가하는 함수
+ */
 static int add_netfilter_rules(char rule_type, int port) {
 
   netfilter_rule* rule = list_last_entry(&rules.list, netfilter_rule, list);
@@ -110,34 +118,37 @@ static void remove_netfilter_rules(int i) {
 
 
 /**
- * TODO: init_net에 대한 설명
- */
-extern struct net init_net;
-
-/**
- * TODO: nf_hook_ops에 대한 설명
+ * 각각 NF_INET_PRE_ROUTING, NF_INET_POST_ROUTING, NF_INET_FORWARD에 대한 nf_hook_ops 정의
  */
 static struct nf_hook_ops* hook_ops_pre = NULL;
 static struct nf_hook_ops* hook_ops_post = NULL;
 static struct nf_hook_ops* hook_ops_forward = NULL;
 
 /**
- * TODO: netfilter_hook_func에 대한 설명
+ * nf_hook_ops가 최종적으로 호출하게 되는 netfilter hook 함수
  */
 static unsigned int _netfilter_hook_func(char rule_type, void* priv, struct sk_buff* skb, const struct nf_hook_state* state) {
 
+  // socket buffer가 없는 경우 예외처리
   if (!skb) {
     return NF_ACCEPT;
   }
 
-  // https://elixir.bootlin.com/linux/v4.4/source/include/linux/ip.h#L23
+  // socket buffer로부터 ip header를 추출
   struct iphdr* ip_header = ip_hdr(skb);
 
+  // 파싱된 ip header가 없는 경우 예외처리
   if (ip_header == NULL) {
     printk(KERN_WARNING "_netfilter_hook_func: ip_header is null!");
     return NF_ACCEPT;
   }
 
+  /**
+   * 각 hooknum에 대한 분기 처리
+   * NF_INET_PRE_ROUTING은 Inbound packet에 대한 처리
+   * NF_INET_POST_ROUTING은 Outbound packet에 대한 처리
+   * NF_INET_FORWARD은 Forwarded packet에 대한 처리
+   */
   char* direction;
   switch (rule_type) {
     case 'I':
@@ -153,64 +164,84 @@ static unsigned int _netfilter_hook_func(char rule_type, void* priv, struct sk_b
       direction = "???";
   }
 
+  // IP Source / Destination Address 추출
   char saddr[16];
   char daddr[16];
   as_net_to_addr(ip_header->saddr, saddr);
   as_net_to_addr(ip_header->daddr, daddr);
 
-  /** TCP가 아닌 경우 */
+  // TCP가 아닌 경우는 정의하지 않았기 때문에, 그대로 Accept
   if (ip_header->protocol != IPPROTO_TCP) {
     return NF_ACCEPT;
   }
 
+  // socket buffer로부터 tcp header를 추출
   struct tcphdr* tcp_header = tcp_hdr(skb);
 
+  // 파싱된 tcp header가 없는 경우 예외처리
   if (tcp_header == NULL) {
     printk(KERN_WARNING "_netfilter_hook_func: tcp_header is null!");
     return NF_ACCEPT;
   }
 
+  // TCP Source / Destination Port 추출, network와 host는 byte order가 다르기 때문에, ntohs 함수로 host byte order로 변환해줌.
   int sport = ntohs(tcp_header->source);
   int dport = ntohs(tcp_header->dest);
+  // TCP Flag 추출
   int syn = tcp_header->syn;
   int fin = tcp_header->fin;
   int ack = tcp_header->ack;
   int rst = tcp_header->rst;
 
-  /** inbound packet의 경우, source port를 확인해야 함. */
+  /** Inbound packet의 경우, destination port가 아닌 source port를 확인해야 함. */
   int target_port = rule_type == 'I' ? sport : dport;
+
+  // Drop rule (I, F, O)에 대한 처리
   if (is_in_netfilter_rules(rule_type, target_port) != 0) {
     /** type, protocol, sport, dport, saddr, daddr, tcp bit */
     printk(KERN_INFO "DROP[%8s]: %d, %d, %d, %s, %s, %d%d%d%d", direction, ip_header->protocol, sport, dport, saddr, daddr, syn, fin, ack, rst);
     return NF_DROP;
   }
 
-  /** proxy */
+  // Proxy rule(P)에 대한 처리
   if (is_in_netfilter_rules('P', sport) != 0) {
+    // IP Destination Address를 FORWARD_NET_ADDR("131.1.1.1")로 변경
     ip_header->daddr = in_aton(FORWARD_NET_ADDR);
+    // TCP Destination Port를 Source Port로 변경. sport는 ntohs로 Byte order를 변경하였기 때문에, 다시 htons 함수를 사용하여 network byte order로 변경.
     tcp_header->dest = htons(sport);
+    // IP Header의 checksum을 다시 계산
     ip_header->check = 0;
     ip_send_check(ip_header);
+
     printk(KERN_INFO "PROXY[%8s]: %d, %d, %d, %s, %s, %d%d%d%d", direction, ip_header->protocol, sport, dport, saddr, FORWARD_NET_ADDR, syn, fin, ack, rst);
     return NF_ACCEPT;
   }
 
+  // Allow rule(그 외)에 대한 로깅
   /** type, protocol, sport, dport, saddr, daddr, tcp bit */
   printk(KERN_INFO "[%8s]: %d, %d, %d, %s, %s, %d%d%d%d", direction, ip_header->protocol, sport, dport, saddr, daddr, syn, fin, ack, rst);
   return NF_ACCEPT;
 
 }
 
+
+/**
+ * NF_INET_PRE_ROUTING Netfilter hook이 실행하는 콜백 함수
+ */
 static unsigned int netfilter_hook_func_pre(void* priv, struct sk_buff* skb, const struct nf_hook_state* state) {
   return _netfilter_hook_func('I', priv, skb, state);
 }
 
-
+/**
+ * NF_INET_POST_ROUTING Netfilter hook이 실행하는 콜백 함수
+ */
 static unsigned int netfilter_hook_func_post(void* priv, struct sk_buff* skb, const struct nf_hook_state* state) {
   return _netfilter_hook_func('O', priv, skb, state);
 }
 
-
+/**
+ * NF_INET_FORWARD Netfilter hook이 실행하는 콜백 함수
+ */
 static unsigned int netfilter_hook_func_forward(void* priv, struct sk_buff* skb, const struct nf_hook_state* state) {
   return _netfilter_hook_func('F', priv, skb, state);
 }
@@ -231,10 +262,12 @@ static ssize_t _proc_write(PROC_WRITE_TYPE type, struct file* file, const char _
   }
 
   switch (type) {
+    // add의 경우(PROC_WRITE_TYPE_ADD) 실행
     case PROC_WRITE_TYPE_ADD:
       sscanf(proc_read_buffer, "%c %d", &rule_type, &port);
       add_netfilter_rules(rule_type, port);
       break;
+    // del의 경우(PROC_WRITE_TYPE_DEL) 실행
     case PROC_WRITE_TYPE_DEL:
       sscanf(proc_read_buffer, "%d", &index);
       remove_netfilter_rules(index);
@@ -245,19 +278,24 @@ static ssize_t _proc_write(PROC_WRITE_TYPE type, struct file* file, const char _
 }
 
 
+/**
+ * /proc/groupx/add Proc file에 write operation이 실행될 때 실행되는 함수
+ */
 static ssize_t proc_write_add(struct file* file, const char __user *buf, size_t len, loff_t *ppos) {
   printk(KERN_INFO "Firewall Module Add!!\n");
   return _proc_write(PROC_WRITE_TYPE_ADD, file, buf, len, ppos);
 }
 
+/**
+ * /proc/groupx/del Proc file에 write operation이 실행될 때 실행되는 함수
+ */
 static ssize_t proc_write_del(struct file* file, const char __user *buf, size_t len, loff_t *ppos) {
   printk(KERN_INFO "Firewall Module Del!!\n");
   return _proc_write(PROC_WRITE_TYPE_DEL, file, buf, len, ppos);
 }
 
 /**
- * proc 파일이 read (e.g. cat /proc/PROC_FILENAME) 될 때 실행되는 부분.
- * user space에서는 리턴값(buffer_length)만큼 user_buffer를 읽음.
+ * proc 파일이 read (e.g. cat /proc/groupx/show) 될 때 실행되는 부분.
  */
 static ssize_t proc_show_read(struct file* file, char __user* user_buffer, size_t count, loff_t* ppos) {
 
@@ -308,7 +346,7 @@ static const struct file_operations fops_del_write = {
 static int __init firewall_module_init(void) {
   printk(KERN_INFO "Firewall Module Init!!\n");
 
-  /** /proc 디렉터리에 PROC_FILENAME 이름으로 proc 파일 생성 */
+  /** /proc 디렉터리에 PROC_DIRNAME 이름으로 proc 디렉터리 생성 */
   proc_dir = proc_mkdir(PROC_DIRNAME, NULL);
   /** Add */
   proc_file_add = proc_create(PROC_FILENAME_ADD, 0600, proc_dir, &fops_add_write);
@@ -317,12 +355,12 @@ static int __init firewall_module_init(void) {
   /** Show */
   proc_file_show = proc_create(PROC_FILENAME_SHOW, 0600, proc_dir, &fops_show_read);
 
-  /** 메모리 동적 할당*/
+  /** nf_hook_ops에 대한 메모리 공간을 동적 할당 */
   hook_ops_pre = (struct nf_hook_ops*)kmalloc(sizeof(struct nf_hook_ops), GFP_KERNEL);
   hook_ops_post = (struct nf_hook_ops*)kmalloc(sizeof(struct nf_hook_ops), GFP_KERNEL);
   hook_ops_forward = (struct nf_hook_ops*)kmalloc(sizeof(struct nf_hook_ops), GFP_KERNEL);
 
-  /** PF_INET (IP) */
+  /** PF_INET (IP)에 대한 처리를 명시 */
   hook_ops_pre->pf = PF_INET;
   hook_ops_post->pf = PF_INET;
   hook_ops_forward->pf = PF_INET;
@@ -346,12 +384,12 @@ enum nf_inet_hooks {
   hook_ops_post->hooknum = NF_INET_POST_ROUTING;
   hook_ops_forward->hooknum = NF_INET_FORWARD;
 
-  /** Set priority */
+  /** nf_hook_ops에 대한 우선순위 설정 */
   hook_ops_pre->priority = NF_IP_PRI_FIRST;
   hook_ops_post->priority = NF_IP_PRI_FIRST;
   hook_ops_forward->priority = NF_IP_PRI_FIRST;
 
-  /** register */
+  /** nf_hook_ops를 등록 */
   nf_register_hook(hook_ops_pre);
   nf_register_hook(hook_ops_post);
   nf_register_hook(hook_ops_forward);
@@ -368,7 +406,7 @@ static void __exit firewall_module_exit(void) {
   proc_remove(proc_file_show);
   proc_remove(proc_dir);
 
-  /** unregister */
+  /** nf_hook_ops 등록을 해제 */
   nf_unregister_hook(hook_ops_pre);
   nf_unregister_hook(hook_ops_post);
   nf_unregister_hook(hook_ops_forward);
