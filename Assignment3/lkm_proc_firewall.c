@@ -415,6 +415,9 @@ static void __exit firewall_module_exit(void) {
   kfree(hook_ops_pre);
   kfree(hook_ops_post);
   kfree(hook_ops_forward);
+  hook_ops_pre = NULL;
+  hook_ops_post = NULL;
+  hook_ops_forward = NULL;
 }
 
 /** 이 모듈이 활성화될 때(insmod) 실행 */
